@@ -25,7 +25,6 @@
     "lint:ts": "tslint -c tslint.json \"src/**/*.ts\"",
     "package": "npm pack",
     "qa": "npm-run-all lint typecheck build package",
-    "reset": "npm run clean && npx rimraf node_modules",
     "start": "npm run watch",
     "typecheck": "tsc",
     "watch": "run-p watch:*",

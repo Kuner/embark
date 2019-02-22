@@ -38,7 +38,6 @@
     "clean": "npx rimraf build-test dist embarkjs-*.tgz package",
     "package": "npm pack",
     "qa": "npm-run-all build test package",
-    "reset": "npm run clean && npx rimraf node_modules",
     "start": "npm run watch",
     "test": "mocha \"build-test/**/*.js\" --exit --no-timeouts --require source-map-support/register",
     "watch": "run-p \"build:** -- --verbose --watch\""

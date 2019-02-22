@@ -1,0 +1,30 @@
+{
+  "name": "embark-template-boilerplate",
+  "version": "4.0.0-beta.0",
+  "description": "",
+  "files": [
+    "app",
+    "config",
+    "contracts",
+    "dot.gitignore",
+    "dot.npmrc",
+    "embark.json",
+    "test"
+  ],
+  "scripts": {
+    "ci": "npm run qa",
+    "clean": "npx embark-reset && npx rimraf embark-*.tgz package",
+    "package": "npm pack",
+    "qa": "npm-run-all test package",
+    "test": "node ../../packages/embark/bin/embark test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "embark-reset": "^4.0.0-beta.0",
+    "embarkjs-connector-web3": "^4.0.0-beta.0",
+    "npm-run-all": "4.1.5",
+    "rimraf": "2.6.3"
+  }
+}

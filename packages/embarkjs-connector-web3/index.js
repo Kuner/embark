@@ -69,7 +69,7 @@ module.exports = async (embark) => {
     let code = `\nconst Web3 = global.__Web3 || require('${symlinkLocation}');`;
     code += `\nglobal.Web3 = Web3;`;
 
-    const connectorCode = fs.readFileSync(path.join(__dirname, 'web3Connector.js'), 'utf8');
+    const connectorCode = fs.readFileSync(path.join(__dirname, 'web3connector.js'), 'utf8');
     code += connectorCode;
 
     code += "\nEmbarkJS.Blockchain.registerProvider('web3', web3Connector);";

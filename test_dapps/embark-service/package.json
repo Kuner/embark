@@ -5,8 +5,6 @@
   "main": "index.js",
   "name": "embark-service",
   "private": true,
-  "scripts": {
-    "reset": "npx rimraf node_modules"
-  },
+  "scripts": {},
   "version": "4.0.0-beta.0"
 }

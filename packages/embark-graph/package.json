@@ -30,7 +30,6 @@
     "package": "npm pack",
     "// qa": "npm-run-all lint typecheck build package",
     "qa": "npm-run-all lint build package",
-    "reset": "npm run clean && npx rimraf node_modules",
     "start": "npm run watch",
     "// typecheck": "tsc",
     "watch": "run-p watch:*",

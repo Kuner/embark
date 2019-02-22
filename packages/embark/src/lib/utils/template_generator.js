@@ -1,8 +1,10 @@
+const findUp = require('find-up');
 const fs = require('../core/fs.js');
 const hostedGitInfo = require('hosted-git-info');
 const utils = require('./utils.js');
 const semver = require('semver');
 const {promisify} = require('util');
+const {execSync} = require('child_process');
 
 const REPLACEMENTS = {
   'git@github.com/': 'git@github.com:',
@@ -89,36 +91,116 @@ class TemplateGenerator {
     const fspath = utils.joinPath(destinationFolder, name);
     this.checkPathExists(fspath);
     console.log(__('Initializing Embark template...').green);
-    let templatePath = fs.embarkPath(utils.joinPath('templates', this.templateName));
-    fs.copySync(templatePath, fspath);
+    const templatePkg = `node_modules/embark-template-${this.templateName}`;
+    let templatePath = require('fs').realpathSync(
+      findUp.sync(templatePkg, {cwd: fs.embarkPath()}) ||
+        fs.embarkPath(templatePkg)
+    );
 
-    this.installTemplate(
+    const tmpDir = require('fs-extra').mkdtempSync(
+      utils.joinPath(require('os').tmpdir(), `${this.templateName}-`)
+    );
+    console.log(tmpDir);
+    execSync(`npm pack ${templatePath}`, {cwd: tmpDir, stdio: 'ignore'});
+    const pkgJson = fs.readJSONSync(
+      utils.joinPath(templatePath, 'package.json')
+    );
+    utils.extractZip(
+      utils.joinPath(
+        tmpDir, `${pkgJson.name}-${pkgJson.version}.tgz`
+      ),
       fspath,
-      name,
-      (this.templateName === 'boilerplate' || this.templateName === 'demo'),
-      () => {
-        if (name === 'embark_demo') {
-          console.log('-------------------'.yellow);
-          console.log(__('Next steps:').green);
-          console.log(('-> ' + ('cd ' + fspath).bold.cyan).green);
-          console.log('-> '.green + 'embark run'.bold.cyan);
-          console.log(__('For more info go to http://embark.status.im').green);
+      {
+        map: file => {
+          const fixed_path = file.path.split('/');
+          fixed_path.shift(); // remove first directory
+          file.path = utils.joinPath(...fixed_path);
+          return file;
         }
+      },
+      () => {
+        this.installTemplate(
+          fspath,
+          name,
+          true,
+          () => {
+            if (name === 'embark_demo') {
+              console.log('-------------------'.yellow);
+              console.log(__('Next steps:').green);
+              console.log(('-> ' + ('cd ' + fspath).bold.cyan).green);
+              console.log('-> '.green + 'embark run'.bold.cyan);
+              console.log(__('For more info go to http://embark.status.im').green);
+            }
+          }
+        );
       }
     );
   }
 
   installTemplate(templatePath, name, installPackages, cb) {
     utils.cd(templatePath);
-    utils.sed('package.json', '%APP_NAME%', name);
+
+    const pkgJson = fs.readJSONSync('./package.json');
+    pkgJson.name = name;
+    if (!(/demo/).test(name)) {
+      pkgJson.version = '0.0.1';
+    }
+    if (!pkgJson.scripts) pkgJson.scripts = {};
+    delete pkgJson.scripts.ci;
+    delete pkgJson.scripts.clean;
+    delete pkgJson.scripts.package;
+    delete pkgJson.scripts.qa;
+    delete pkgJson.scripts.reset;
+    pkgJson.scripts.test = 'embark test';
+    if (pkgJson.devDependencies) {
+      delete pkgJson.devDependencies['embark-reset'];
+      delete pkgJson.devDependencies['npm-run-all'];
+      delete pkgJson.devDependencies['rimraf'];
+    }
+    fs.writeFileSync('package.json', JSON.stringify(pkgJson, null, 2));
+
     if (fs.existsSync('dot.gitignore')) {
-      fs.moveSync('dot.gitignore', '.gitignore');
-    } else if (!fs.existsSync('.gitignore')) {
-      fs.copySync(fs.embarkPath('templates/dot.gitignore'), '.gitignore');
+      fs.moveSync('dot.gitignore', '.gitignore', {overwrite: true});
+    }
+    if (fs.existsSync('dot.npmrc')) {
+      fs.moveSync('dot.npmrc', '.npmrc', {overwrite: true});
     }
 
     if (installPackages) {
       console.log(__('Installing packages...').green);
+      const insideMonorepo = fs.existsSync(
+        utils.joinPath(fs.embarkPath(), '../../packages/embark')
+      );
+      if (insideMonorepo) {
+        const monorepoRoot = utils.dirname(
+          findUp.sync('lerna.json', {cwd: fs.embarkPath()})
+        );
+        let links = [];
+        execSync(
+          'npx lerna list --long --parseable',
+          {cwd: monorepoRoot,
+           stdio: ['ignore', 'pipe', 'ignore']}
+        )
+          .toString()
+          .trim()
+          .split('\n')
+          .forEach(line => {
+            const [pkgDir, pkgName] = line.split(':');
+            if ((pkgJson.dependencies && pkgJson.dependencies[pkgName]) ||
+                (pkgJson.devDependencies && pkgJson.devDependencies[pkgName])) {
+              links.push(pkgName);
+              const cmd = 'yarn unlink && yarn link || yarn link';
+              console.log(`cd ${pkgDir}; ${cmd}`.yellow);
+              execSync(cmd, {cwd: pkgDir, stdio: 'ignore'});
+            }
+          });
+        if (links.length) {
+          const cmd = `yarn link ${links.join(' ')}`;
+          console.log(`cd ${templatePath}; ${cmd}`.yellow);
+          execSync(cmd, {stdio: 'ignore'});
+        }
+      }
+
       utils.runCmd('npm install', {exitOnError: false}, (err) => {
         if (err) {
           console.error(__('Could not install dependencies. Try running `npm install` inside the project directory.').red);
